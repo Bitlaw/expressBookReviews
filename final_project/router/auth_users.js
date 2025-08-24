@@ -1,19 +1,19 @@
-// User authentication and book review management module
+// Import necessary modules
 const express = require("express");
 const jwt = require("jsonwebtoken");
 
-// Load book database
+// Import database of books
 let books = require("./booksdb.js");
 
-// Create router for authenticated user endpoints
+// Create a router instance for registered user routes
 const regd_users = express.Router();
 
-// Store registered user accounts
+// Initialize an empty array to store registered users
 let users = [];
 
-// Validate username format and restrictions
+// Function to check if a username is valid
 const isValid = (username) => {
-  // Basic validation: username must exist and be alphanumeric
+  // Check if the username is not empty and is alphanumeric
   if (!username || !/^[a-zA-Z0-9]+$/.test(username)) {
     return false;
   }
@@ -38,7 +38,7 @@ const isValid = (username) => {
   return true;
 };
 
-// Verify user credentials against stored records
+// Function to check if a username and password match the records
 const authenticatedUser = (username, password) => {
   // Ensure both credentials are provided
   if (!username || !password) {
@@ -63,56 +63,91 @@ const authenticatedUser = (username, password) => {
   return false;
 };
 
-// Handle user authentication and JWT token generation
+// Task 7: Route to handle user login
 regd_users.post("/login", (req, res) => {
   const { username, password } = req.body;
 
-  // Validate required credentials
+  // Check if username and password are provided
   if (!username || !password) {
     return res
       .status(400)
       .json({ message: "Username and password are required" });
   }
 
-  // Authenticate user credentials
+  // Check if the user is registered and the provided credentials are correct
   if (!authenticatedUser(username, password)) {
     return res.status(401).json({ message: "Invalid credentials" });
   }
 
-  // Create secure JWT token for session management
+  // Generate JWT token
   const token = jwt.sign({ username: username }, "your_secret_key");
 
-  // Send authentication token to client
+  // Return the token as a response
   return res.status(200).json({ token: token });
 });
 
-// Allow authenticated users to submit book reviews
+// Task 8: Route to add or modify a book review
 regd_users.put("/auth/review/:isbn", (req, res) => {
   const { isbn } = req.params;
   const { review } = req.body;
+  const username = req.user.username; // Get username from JWT token
 
-  // Ensure review content is provided
+  // Check if review is provided
   if (!review) {
     return res.status(400).json({ message: "Review is required" });
   }
 
-  // Verify book exists in database
+  // Check if the book exists
   if (!books[isbn]) {
     return res.status(404).json({ message: "Book not found" });
   }
 
-  // Add new review to book's review collection
-  books[isbn].reviews.push(review);
+  // Initialize reviews object if it doesn't exist
+  if (!books[isbn].reviews) {
+    books[isbn].reviews = {};
+  }
 
-  // Confirm successful review submission
-  return res.status(200).json({ message: "Review added successfully" });
+  // Add or modify the review (username as key)
+  books[isbn].reviews[username] = review;
+
+  // Return success message
+  return res
+    .status(200)
+    .json({ message: "Review added/modified successfully" });
 });
 
-// Export authenticated user router
+// Task 9: Route to delete a book review
+regd_users.delete("/auth/review/:isbn", (req, res) => {
+  const { isbn } = req.params;
+  const username = req.user.username; // Get username from JWT token
+
+  // Check if the book exists
+  if (!books[isbn]) {
+    return res.status(404).json({ message: "Book not found" });
+  }
+
+  // Check if the book has reviews
+  if (!books[isbn].reviews) {
+    return res.status(404).json({ message: "No reviews found for this book" });
+  }
+
+  // Check if the user has a review for this book
+  if (!books[isbn].reviews[username]) {
+    return res.status(404).json({ message: "Review not found for this user" });
+  }
+
+  // Delete the user's review
+  delete books[isbn].reviews[username];
+
+  // Return success message
+  return res.status(200).json({ message: "Review deleted successfully" });
+});
+
+// Export the router containing registered user routes
 module.exports.authenticated = regd_users;
 
-// Export username validation function
+// Export the isValid function to validate usernames
 module.exports.isValid = isValid;
 
-// Export user database
+// Export the users array to store registered users
 module.exports.users = users;
